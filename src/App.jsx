@@ -1,19 +1,67 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { collection, addDoc, getDocs, orderBy, query } from 'firebase/firestore'
 import { db } from './firebase.js'
 import { uid, LS } from './utils.js'
-import {
-  ARCHETYPES, AFFINITIES, SPECIAL_AFFs, GRADES, ROLES, GENRES,
-  AFF_CLR, GRADE_CLR
-} from './constants.js'
+import { ARCHETYPES, AFFINITIES, SPECIAL_AFFs, GRADES, ROLES, GENRES, AFF_CLR, GRADE_CLR } from './constants.js'
 
-// ─── Toast ────────────────────────────────────────────────────────────────────
-function Toast({ msg, onDone }) {
-  useEffect(() => { const t = setTimeout(onDone, 2400); return () => clearTimeout(t) }, [])
-  return <div className="toast">{msg}</div>
+// ── RUNE FIELD (floating background particles) ─────────────────────────────
+const RUNES = ['᚛','᚜','ᚐ','ᚑ','ᚒ','ᚓ','ᚔ','✦','✧','⚔','⚡','◈','⬡','⬢','△','▽','◇','✵','⊕','⊗','⊙','❋','✺','✹','⊛']
+function RuneField() {
+  const runes = useRef([])
+  if (runes.current.length === 0) {
+    runes.current = Array.from({ length: 18 }, (_, i) => ({
+      id: i,
+      char: RUNES[Math.floor(Math.random() * RUNES.length)],
+      left: Math.random() * 100,
+      size: 10 + Math.random() * 14,
+      duration: 14 + Math.random() * 20,
+      delay: -(Math.random() * 20),
+    }))
+  }
+  return (
+    <div className="rune-field">
+      {runes.current.map(r => (
+        <div key={r.id} className="rune" style={{
+          left: `${r.left}%`, fontSize: `${r.size}px`,
+          animationDuration: `${r.duration}s`, animationDelay: `${r.delay}s`,
+        }}>{r.char}</div>
+      ))}
+    </div>
+  )
 }
 
-// ─── Confirm Modal ────────────────────────────────────────────────────────────
+// ── COUNT UP STAT ──────────────────────────────────────────────────────────
+function CountUpStat({ value, label }) {
+  const [display, setDisplay] = useState(0)
+  const raf = useRef(null)
+  useEffect(() => {
+    const target = parseInt(value) || 0
+    const start = performance.now()
+    const duration = 800
+    const step = (now) => {
+      const t = Math.min((now - start) / duration, 1)
+      const ease = 1 - Math.pow(1 - t, 3)
+      setDisplay(Math.round(target * ease))
+      if (t < 1) raf.current = requestAnimationFrame(step)
+    }
+    raf.current = requestAnimationFrame(step)
+    return () => cancelAnimationFrame(raf.current)
+  }, [value])
+  return (
+    <div className="stat-box">
+      <div className="stat-label">{label}</div>
+      <div className="stat-val">{display}</div>
+    </div>
+  )
+}
+
+// ── TOAST ──────────────────────────────────────────────────────────────────
+function Toast({ msg, onDone }) {
+  useEffect(() => { const t = setTimeout(onDone, 2600); return () => clearTimeout(t) }, [])
+  return <div className="toast">✦ {msg}</div>
+}
+
+// ── CONFIRM MODAL ──────────────────────────────────────────────────────────
 function ConfirmModal({ msg, onClose, onConfirm }) {
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
@@ -30,7 +78,7 @@ function ConfirmModal({ msg, onClose, onConfirm }) {
   )
 }
 
-// ─── New Story Modal ──────────────────────────────────────────────────────────
+// ── NEW STORY MODAL ────────────────────────────────────────────────────────
 function NewStoryModal({ onClose, onCreate }) {
   const [f, sf] = useState({ title: '', genre: 'Fantasy', description: '', type: 'chapters' })
   const set = (k, v) => sf(p => ({ ...p, [k]: v }))
@@ -41,7 +89,7 @@ function NewStoryModal({ onClose, onCreate }) {
         <div className="modal-title">✦ New Story</div>
         <div className="form-group">
           <label className="form-label">Title</label>
-          <input className="form-input" placeholder="Name your legend..." value={f.title} onChange={e => set('title', e.target.value)} />
+          <input className="form-input" placeholder="Name your legend..." value={f.title} onChange={e => set('title', e.target.value)} autoFocus />
         </div>
         <div className="form-group">
           <label className="form-label">Genre</label>
@@ -69,7 +117,7 @@ function NewStoryModal({ onClose, onCreate }) {
   )
 }
 
-// ─── New Chapter Modal ────────────────────────────────────────────────────────
+// ── NEW CHAPTER MODAL ──────────────────────────────────────────────────────
 function NewChapterModal({ onClose, onCreate }) {
   const [t, st] = useState('')
   return (
@@ -79,7 +127,7 @@ function NewChapterModal({ onClose, onCreate }) {
         <div className="modal-title">⚔ New Chapter</div>
         <div className="form-group">
           <label className="form-label">Chapter Title</label>
-          <input className="form-input" placeholder="The Awakening..." value={t} onChange={e => st(e.target.value)} />
+          <input className="form-input" placeholder="The Awakening..." value={t} onChange={e => st(e.target.value)} autoFocus />
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
           <button className="btn btn-outline" onClick={onClose}>Cancel</button>
@@ -90,7 +138,7 @@ function NewChapterModal({ onClose, onCreate }) {
   )
 }
 
-// ─── New Part Modal ───────────────────────────────────────────────────────────
+// ── NEW PART MODAL ─────────────────────────────────────────────────────────
 function NewPartModal({ onClose, onCreate }) {
   const [t, st] = useState('')
   return (
@@ -100,7 +148,7 @@ function NewPartModal({ onClose, onCreate }) {
         <div className="modal-title">✦ New Part</div>
         <div className="form-group">
           <label className="form-label">Part Title</label>
-          <input className="form-input" placeholder="Part title..." value={t} onChange={e => st(e.target.value)} />
+          <input className="form-input" placeholder="Part title..." value={t} onChange={e => st(e.target.value)} autoFocus />
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
           <button className="btn btn-outline" onClick={onClose}>Cancel</button>
@@ -111,16 +159,11 @@ function NewPartModal({ onClose, onCreate }) {
   )
 }
 
-// ─── New Character Modal ──────────────────────────────────────────────────────
+// ── NEW CHARACTER MODAL ────────────────────────────────────────────────────
 function NewCharModal({ onClose, onCreate }) {
-  const [f, sf] = useState({
-    name: '', role: 'Protagonist', archetype: 'Warrior',
-    affinities: [], grade: '1st Grade',
-    level: 1, health: 100, speed: 10, mana: 50, lore: ''
-  })
+  const [f, sf] = useState({ name: '', role: 'Protagonist', archetype: 'Warrior', affinities: [], grade: '1st Grade', level: 1, health: 100, speed: 10, mana: 50, lore: '' })
   const set = (k, v) => sf(p => ({ ...p, [k]: v }))
   const togAff = a => set('affinities', f.affinities.includes(a) ? f.affinities.filter(x => x !== a) : [...f.affinities, a])
-
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal">
@@ -128,7 +171,7 @@ function NewCharModal({ onClose, onCreate }) {
         <div className="modal-title">⚔ New Character</div>
         <div className="form-group">
           <label className="form-label">Name</label>
-          <input className="form-input" placeholder="Character name..." value={f.name} onChange={e => set('name', e.target.value)} />
+          <input className="form-input" placeholder="Character name..." value={f.name} onChange={e => set('name', e.target.value)} autoFocus />
         </div>
         <div className="form-group">
           <label className="form-label">Role</label>
@@ -145,17 +188,11 @@ function NewCharModal({ onClose, onCreate }) {
         <div className="form-group">
           <label className="form-label">Affinities — Elements</label>
           <div className="multi-select">
-            {AFFINITIES.map(a => (
-              <div key={a} className={`multi-chip ${f.affinities.includes(a) ? 'sel' : ''}`}
-                style={{ color: AFF_CLR[a] }} onClick={() => togAff(a)}>{a}</div>
-            ))}
+            {AFFINITIES.map(a => <div key={a} className={`multi-chip ${f.affinities.includes(a) ? 'sel' : ''}`} style={{ color: AFF_CLR[a] }} onClick={() => togAff(a)}>{a}</div>)}
           </div>
-          <div style={{ marginTop: 8, fontSize: 10, color: 'var(--text3)', fontFamily: 'Cinzel,serif', letterSpacing: 2, marginBottom: 5 }}>SPECIAL</div>
+          <div style={{ fontSize: 10, color: 'var(--text3)', fontFamily: 'Cinzel,serif', letterSpacing: 2, margin: '8px 0 5px' }}>SPECIAL</div>
           <div className="multi-select">
-            {SPECIAL_AFFs.map(a => (
-              <div key={a} className={`multi-chip ${f.affinities.includes(a) ? 'sel' : ''}`}
-                style={{ color: AFF_CLR[a] }} onClick={() => togAff(a)}>{a}</div>
-            ))}
+            {SPECIAL_AFFs.map(a => <div key={a} className={`multi-chip ${f.affinities.includes(a) ? 'sel' : ''}`} style={{ color: AFF_CLR[a] }} onClick={() => togAff(a)}>{a}</div>)}
           </div>
         </div>
         <div className="form-group">
@@ -163,7 +200,7 @@ function NewCharModal({ onClose, onCreate }) {
           <div className="grade-grid">
             {GRADES.map(g => (
               <div key={g} className={`grade-btn ${f.grade === g ? 'active' : ''}`}
-                style={f.grade === g ? { background: GRADE_CLR[g] || 'var(--gold)', borderColor: GRADE_CLR[g] || 'var(--gold)', color: '#fff' } : {}}
+                style={f.grade === g ? { background: GRADE_CLR[g] || 'var(--gold)', borderColor: GRADE_CLR[g] || 'var(--gold)', color: '#fff', boxShadow: `0 0 12px ${GRADE_CLR[g] || 'var(--gold)'}` } : {}}
                 onClick={() => set('grade', g)}>{g}</div>
             ))}
           </div>
@@ -192,7 +229,7 @@ function NewCharModal({ onClose, onCreate }) {
   )
 }
 
-// ─── Chapter Stat Modal ───────────────────────────────────────────────────────
+// ── CHAR STAT MODAL ────────────────────────────────────────────────────────
 function CharStatModal({ char, chapter, onClose, onSave }) {
   const ex = char.chapterStats?.[chapter.id] || {}
   const [s, ss] = useState({ level: ex.level || char.level || 1, health: ex.health || char.health || 100, speed: ex.speed || char.speed || 10, mana: ex.mana || char.mana || 50 })
@@ -201,7 +238,7 @@ function CharStatModal({ char, chapter, onClose, onSave }) {
       <div className="modal">
         <div className="modal-drag" />
         <div className="modal-title">{char.name} — {chapter.title}</div>
-        <p style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 14 }}>Set this character's stats for this chapter</p>
+        <p style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 14 }}>Set chapter-specific stats for this character</p>
         <div className="stats-input-grid">
           {['level', 'health', 'speed', 'mana'].map(k => (
             <div key={k}>
@@ -219,7 +256,7 @@ function CharStatModal({ char, chapter, onClose, onSave }) {
   )
 }
 
-// ─── Publish Modal ────────────────────────────────────────────────────────────
+// ── PUBLISH MODAL ──────────────────────────────────────────────────────────
 function PublishModal({ stories, onClose, onPublish }) {
   const [sel, setSel] = useState(null)
   return (
@@ -231,7 +268,7 @@ function PublishModal({ stories, onClose, onPublish }) {
         {stories.length === 0 && <div style={{ color: 'var(--text3)', fontSize: 13, textAlign: 'center', padding: '20px 0' }}>No stories in your library yet.</div>}
         {stories.map(s => (
           <div key={s.id} className="ch-item"
-            style={sel === s.id ? { borderColor: 'var(--gold)', background: 'rgba(201,168,76,.08)' } : {}}
+            style={sel === s.id ? { borderColor: 'var(--gold)', background: 'rgba(201,168,76,.08)', boxShadow: '0 0 15px rgba(201,168,76,0.15)' } : {}}
             onClick={() => setSel(s.id)}>
             <div style={{ fontFamily: 'Cinzel,serif', fontSize: 13, color: sel === s.id ? 'var(--gold2)' : 'var(--text)' }}>{s.title}</div>
             <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 3 }}>{s.genre} · {s.type} · {s.chapters?.length || 0} chapters</div>
@@ -246,22 +283,26 @@ function PublishModal({ stories, onClose, onPublish }) {
   )
 }
 
-// ─── Plain Editor (auto-save debounce) ───────────────────────────────────────
+// ── PLAIN EDITOR ───────────────────────────────────────────────────────────
 function PlainEditor({ value, onChange }) {
   const [v, sv] = useState(value)
-  const db = useRef(null)
-  const handle = e => {
-    sv(e.target.value)
-    clearTimeout(db.current)
-    db.current = setTimeout(() => onChange(e.target.value), 900)
-  }
-  return <textarea className="editor-area" placeholder="Begin your tale..." value={v} onChange={handle} style={{ minHeight: 360 }} />
+  const timer = useRef(null)
+  const wc = v.trim() ? v.trim().split(/\s+/).length : 0
+  const handle = e => { sv(e.target.value); clearTimeout(timer.current); timer.current = setTimeout(() => onChange(e.target.value), 900) }
+  return (
+    <>
+      <textarea className="editor-area" placeholder="Begin your tale... Every legend starts with a single word." value={v} onChange={handle} style={{ minHeight: 360 }} />
+      <div style={{ fontSize: 11, color: 'var(--text3)', textAlign: 'right', padding: '4px 16px 0', fontFamily: 'Cinzel,serif', letterSpacing: 1 }}>
+        {wc} {wc === 1 ? 'word' : 'words'}
+      </div>
+    </>
+  )
 }
 
-// ─── Story List ───────────────────────────────────────────────────────────────
-function StoryList({ stories, onOpen }) {
+// ── STORY LIST ─────────────────────────────────────────────────────────────
+function StoryList({ stories }) {
   return (
-    <div>
+    <div className="screen-fade">
       <div className="screen-header"><h2>Your Library</h2></div>
       {stories.length === 0 ? (
         <div className="empty-state">
@@ -269,8 +310,9 @@ function StoryList({ stories, onOpen }) {
           <div className="empty-title">No Stories Yet</div>
           <div className="empty-desc">Tap ✦ to forge your first tale and begin your legend.</div>
         </div>
-      ) : stories.map(s => (
-        <div key={s.id} className="card story-card" onClick={() => onOpen(s)}>
+      ) : stories.map((s, i) => (
+        <div key={s.id} className="card story-card stagger-item" data-i={i}
+          onClick={() => null /* handled by parent */} id={`story-${s.id}`}>
           <div className="card-title">{s.title}</div>
           <div className="card-sub">{s.genre}</div>
           <span className={`type-badge ${s.type === 'chapters' ? 'b-chapters' : 'b-plain'}`}>
@@ -288,14 +330,14 @@ function StoryList({ stories, onOpen }) {
   )
 }
 
-// ─── Story Screen ─────────────────────────────────────────────────────────────
+// ── STORY SCREEN ───────────────────────────────────────────────────────────
 function StoryScreen({ story, onBack, onChapter, onChar, onEdit, setModal, setDelTarget, onDeleteStory }) {
   const [editDesc, setEditDesc] = useState(false)
   const [desc, setDesc] = useState(story.description || '')
   const isLocked = idx => idx > 0 && !story.chapters[idx - 1]?.completed
 
   return (
-    <div>
+    <div className="screen-enter">
       <div className="screen-header">
         <button className="back-btn" onClick={onBack}>←</button>
         <h2>{story.title}</h2>
@@ -316,8 +358,8 @@ function StoryScreen({ story, onBack, onChapter, onChar, onEdit, setModal, setDe
       </div>
 
       <div className="section-label">Characters</div>
-      {(story.characters || []).map(c => (
-        <div key={c.id} className="card char-card" onClick={() => onChar(c)}>
+      {(story.characters || []).map((c, i) => (
+        <div key={c.id} className="card char-card stagger-item" onClick={() => onChar(c)}>
           <div className="char-row">
             <div className="char-avatar">{(c.name || '?')[0].toUpperCase()}</div>
             <div style={{ flex: 1, minWidth: 0 }}>
@@ -341,7 +383,7 @@ function StoryScreen({ story, onBack, onChapter, onChar, onEdit, setModal, setDe
           {(story.chapters || []).map((ch, idx) => {
             const locked = isLocked(idx)
             return (
-              <div key={ch.id} className={`ch-item ${locked ? 'locked-ch' : ''}`} onClick={() => !locked && onChapter(ch)}>
+              <div key={ch.id} className={`ch-item stagger-item ${locked ? 'locked-ch' : ''}`} onClick={() => !locked && onChapter(ch)}>
                 {locked && <><div className="fog-particles" /><div className="fog-overlay"><div className="fog-icon">🌫</div><div className="fog-text">Fog of War — Unlocks after Chapter {idx}</div></div></>}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
@@ -349,7 +391,9 @@ function StoryScreen({ story, onBack, onChapter, onChar, onEdit, setModal, setDe
                     <div style={{ fontFamily: 'Cinzel,serif', fontSize: 13, color: locked ? 'var(--text3)' : 'var(--gold2)', marginTop: 2 }}>{ch.title}</div>
                     <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 3 }}>{ch.parts?.length || 0} parts · {ch.completed ? '✦ Complete' : 'In Progress'}</div>
                   </div>
-                  <div style={{ fontSize: 20, color: locked ? 'var(--text3)' : ch.completed ? 'var(--gold2)' : 'var(--text2)' }}>{locked ? '🔒' : ch.completed ? '✦' : '▶'}</div>
+                  <div style={{ fontSize: 22, color: locked ? 'var(--text3)' : ch.completed ? 'var(--gold2)' : 'var(--text2)', filter: ch.completed ? 'drop-shadow(0 0 6px var(--gold))' : 'none' }}>
+                    {locked ? '🔒' : ch.completed ? '✦' : '▶'}
+                  </div>
                 </div>
               </div>
             )
@@ -366,14 +410,14 @@ function StoryScreen({ story, onBack, onChapter, onChar, onEdit, setModal, setDe
   )
 }
 
-// ─── Chapter Screen ───────────────────────────────────────────────────────────
+// ── CHAPTER SCREEN ─────────────────────────────────────────────────────────
 function ChapterScreen({ story, chapter, onBack, onPart, onToggleComplete, setModal, onUpdateChapter, setDelTarget, onDeleteChapter }) {
   const [edit, setEdit] = useState(false)
   const [content, setContent] = useState(chapter.content || '')
-  const save = () => { onUpdateChapter({ content }); setEdit(false) }
+  const wc = content.trim() ? content.trim().split(/\s+/).length : 0
 
   return (
-    <div>
+    <div className="screen-enter">
       <div className="screen-header">
         <button className="back-btn" onClick={onBack}>←</button>
         <h2>{chapter.title}</h2>
@@ -389,25 +433,29 @@ function ChapterScreen({ story, chapter, onBack, onPart, onToggleComplete, setMo
       <div className="section-label">Chapter Writing</div>
       {edit ? (
         <div style={{ padding: '0 16px' }}>
-          <textarea className="editor-area" style={{ margin: 0, width: '100%', minHeight: 220 }} value={content} onChange={e => setContent(e.target.value)} />
+          <textarea className="editor-area" style={{ margin: 0, width: '100%', minHeight: 240 }} value={content} onChange={e => setContent(e.target.value)} autoFocus />
+          <div style={{ fontSize: 11, color: 'var(--text3)', textAlign: 'right', marginTop: 4, fontFamily: 'Cinzel,serif', letterSpacing: 1 }}>{wc} words</div>
           <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-            <button className="btn btn-gold btn-sm" onClick={save}>Save</button>
+            <button className="btn btn-gold btn-sm" onClick={() => { onUpdateChapter({ content }); setEdit(false) }}>Save</button>
             <button className="btn btn-outline btn-sm" onClick={() => setEdit(false)}>Cancel</button>
           </div>
         </div>
       ) : (
         <div className="card" style={{ cursor: 'text' }} onClick={() => setEdit(true)}>
-          {chapter.content ? <p style={{ fontSize: 15, lineHeight: 1.8, color: 'var(--text)' }}>{chapter.content}</p> : <p style={{ color: 'var(--text3)', fontSize: 14 }}>Tap to write chapter content...</p>}
+          {chapter.content
+            ? <p style={{ fontSize: 15, lineHeight: 1.8, color: 'var(--text)' }}>{chapter.content}</p>
+            : <p style={{ color: 'var(--text3)', fontSize: 14 }}>Tap to write chapter content...</p>
+          }
         </div>
       )}
 
       {chapter.parts?.length > 0 && <>
         <div className="section-label" style={{ marginTop: 6 }}>Parts</div>
         {chapter.parts.map(p => (
-          <div key={p.id} className="part-item" onClick={() => onPart(p)}>
+          <div key={p.id} className="part-item stagger-item" onClick={() => onPart(p)}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span>{p.title}</span>
-              <span style={{ fontSize: 11, color: 'var(--text3)' }}>{p.content ? p.content.length + ' chars' : 'Empty'} →</span>
+              <span style={{ fontSize: 11, color: 'var(--text3)' }}>{p.content ? p.content.split(/\s+/).filter(Boolean).length + ' words' : 'Empty'} →</span>
             </div>
           </div>
         ))}
@@ -416,30 +464,28 @@ function ChapterScreen({ story, chapter, onBack, onPart, onToggleComplete, setMo
   )
 }
 
-// ─── Part Screen ──────────────────────────────────────────────────────────────
+// ── PART SCREEN ────────────────────────────────────────────────────────────
 function PartScreen({ story, chapter, part, onBack, onUpdate }) {
   const [v, sv] = useState(part.content || '')
   const timer = useRef(null)
-  const handle = e => {
-    sv(e.target.value)
-    clearTimeout(timer.current)
-    timer.current = setTimeout(() => onUpdate({ content: e.target.value }), 900)
-  }
+  const wc = v.trim() ? v.trim().split(/\s+/).length : 0
+  const handle = e => { sv(e.target.value); clearTimeout(timer.current); timer.current = setTimeout(() => onUpdate({ content: e.target.value }), 900) }
   return (
-    <div>
+    <div className="screen-enter">
       <div className="screen-header">
         <button className="back-btn" onClick={onBack}>←</button>
         <h2>{part.title}</h2>
       </div>
-      <textarea className="editor-area" style={{ minHeight: 420 }} placeholder="Write this part of the story..." value={v} onChange={handle} />
+      <textarea className="editor-area" style={{ minHeight: 420 }} placeholder="Write this part of the story..." value={v} onChange={handle} autoFocus />
+      <div style={{ fontSize: 11, color: 'var(--text3)', textAlign: 'right', padding: '4px 16px 0', fontFamily: 'Cinzel,serif', letterSpacing: 1 }}>{wc} words</div>
     </div>
   )
 }
 
-// ─── Char Detail Screen ───────────────────────────────────────────────────────
+// ── CHAR DETAIL SCREEN ─────────────────────────────────────────────────────
 function CharDetailScreen({ story, char, onBack, setModal, setStatChapter, setDelTarget, onDeleteChar }) {
   return (
-    <div>
+    <div className="screen-enter">
       <div className="screen-header">
         <button className="back-btn" onClick={onBack}>←</button>
         <h2>Character</h2>
@@ -448,7 +494,7 @@ function CharDetailScreen({ story, char, onBack, setModal, setStatChapter, setDe
 
       <div style={{ textAlign: 'center', padding: '16px 16px 8px' }}>
         <div className="char-detail-avatar">{(char.name || '?')[0].toUpperCase()}</div>
-        <div style={{ fontFamily: "'Cinzel Decorative',serif", fontSize: 19, color: 'var(--gold2)' }}>{char.name}</div>
+        <div style={{ fontFamily: "'Cinzel Decorative',serif", fontSize: 19, color: 'var(--gold2)', animation: 'shimmer 4s linear infinite', background: 'linear-gradient(90deg,var(--gold) 0%,var(--gold3) 40%,#fff 50%,var(--gold3) 60%,var(--gold) 100%)', backgroundSize: '200% auto', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>{char.name}</div>
         <div style={{ fontFamily: 'Cinzel,serif', fontSize: 10, letterSpacing: 3, color: 'var(--text3)', textTransform: 'uppercase', marginTop: 3 }}>{char.role}</div>
       </div>
 
@@ -456,13 +502,13 @@ function CharDetailScreen({ story, char, onBack, setModal, setStatChapter, setDe
         <div className="card-title">Identity</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 10 }}>
           <div><div className="stat-label">Archetype</div><div style={{ color: 'var(--gold2)', fontFamily: 'Cinzel,serif', marginTop: 3, fontSize: 13 }}>{char.archetype}</div></div>
-          <div><div className="stat-label">Grade</div><div style={{ color: GRADE_CLR[char.grade] || 'var(--gold)', fontFamily: 'Cinzel,serif', marginTop: 3, fontSize: 13 }}>{char.grade}</div></div>
+          <div><div className="stat-label">Grade</div><div style={{ color: GRADE_CLR[char.grade] || 'var(--gold)', fontFamily: 'Cinzel,serif', marginTop: 3, fontSize: 13, textShadow: `0 0 10px ${GRADE_CLR[char.grade] || 'var(--gold)'}` }}>{char.grade}</div></div>
         </div>
         <div style={{ marginTop: 12 }}>
           <div className="stat-label">Affinities</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 5 }}>
-            {(char.affinities || []).map(a => <span key={a} className="badge" style={{ color: AFF_CLR[a], borderColor: AFF_CLR[a] }}>{a}</span>)}
-            {(!char.affinities || char.affinities.length === 0) && <span style={{ color: 'var(--text3)', fontSize: 13 }}>None</span>}
+            {(char.affinities || []).map(a => <span key={a} className="badge" style={{ color: AFF_CLR[a], borderColor: AFF_CLR[a], boxShadow: `0 0 8px ${AFF_CLR[a]}40` }}>{a}</span>)}
+            {(!char.affinities || char.affinities.length === 0) && <span style={{ color: 'var(--text3)', fontSize: 13 }}>None assigned</span>}
           </div>
         </div>
       </div>
@@ -470,12 +516,10 @@ function CharDetailScreen({ story, char, onBack, setModal, setStatChapter, setDe
       <div className="card">
         <div className="card-title">Base Stats</div>
         <div className="stats-grid" style={{ marginTop: 10 }}>
-          {['level', 'health', 'speed', 'mana'].map(k => (
-            <div key={k} className="stat-box">
-              <div className="stat-label">{k}</div>
-              <div className="stat-val">{char[k] || 0}</div>
-            </div>
-          ))}
+          <CountUpStat value={char.level || 0} label="level" />
+          <CountUpStat value={char.health || 0} label="health" />
+          <CountUpStat value={char.speed || 0} label="speed" />
+          <CountUpStat value={char.mana || 0} label="mana" />
         </div>
       </div>
 
@@ -493,17 +537,17 @@ function CharDetailScreen({ story, char, onBack, setModal, setStatChapter, setDe
             const prevOk = idx === 0 || story.chapters[idx - 1]?.completed
             const stats = char.chapterStats?.[ch.id]
             return (
-              <div key={ch.id} className="ch-item" style={{ margin: '0 16px 8px', position: 'relative' }}>
+              <div key={ch.id} className="ch-item stagger-item" style={{ margin: '0 16px 8px', position: 'relative' }}>
                 {!prevOk && <><div className="fog-particles" /><div className="fog-overlay"><div className="fog-icon">🌫</div><div className="fog-text">Unlocks after Chapter {idx}</div></div></>}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
                     <div style={{ fontFamily: 'Cinzel,serif', fontSize: 9, color: 'var(--text3)', letterSpacing: 2, textTransform: 'uppercase' }}>Ch.{idx + 1} · {ch.title}</div>
                     {stats && (
-                      <div style={{ display: 'flex', gap: 12, marginTop: 6 }}>
+                      <div style={{ display: 'flex', gap: 14, marginTop: 6 }}>
                         {['level', 'health', 'speed', 'mana'].map(k => (
                           <div key={k} style={{ textAlign: 'center' }}>
                             <div style={{ fontSize: 8, color: 'var(--text3)', fontFamily: 'Cinzel,serif', letterSpacing: 1 }}>{k}</div>
-                            <div style={{ fontSize: 14, color: 'var(--gold2)', fontFamily: 'Cinzel,serif' }}>{stats[k] || 0}</div>
+                            <div style={{ fontSize: 15, color: 'var(--gold2)', fontFamily: 'Cinzel,serif', fontWeight: 700 }}>{stats[k] || 0}</div>
                           </div>
                         ))}
                       </div>
@@ -525,7 +569,7 @@ function CharDetailScreen({ story, char, onBack, setModal, setStatChapter, setDe
   )
 }
 
-// ─── Online Tab ───────────────────────────────────────────────────────────────
+// ── ONLINE TAB ─────────────────────────────────────────────────────────────
 function OnlineTab({ online, stories, setModal }) {
   const [published, setPublished] = useState([])
   const [loading, setLoading] = useState(false)
@@ -552,7 +596,7 @@ function OnlineTab({ online, stories, setModal }) {
   )
 
   if (reading) return (
-    <div>
+    <div className="screen-enter">
       <div className="screen-header">
         <button className="back-btn" onClick={() => setReading(null)}>←</button>
         <h2>{reading.title}</h2>
@@ -560,7 +604,7 @@ function OnlineTab({ online, stories, setModal }) {
       {reading.characters?.length > 0 && <>
         <div className="section-label">Characters</div>
         {reading.characters.map(c => (
-          <div key={c.id} className="card">
+          <div key={c.id} className="card stagger-item">
             <div className="char-row">
               <div className="char-avatar">{(c.name || '?')[0].toUpperCase()}</div>
               <div style={{ flex: 1 }}>
@@ -571,12 +615,10 @@ function OnlineTab({ online, stories, setModal }) {
                   {c.grade && <span className="badge" style={{ color: GRADE_CLR[c.grade] || 'var(--gold)', borderColor: GRADE_CLR[c.grade] || 'var(--gold)' }}>{c.grade}</span>}
                 </div>
                 <div className="stats-grid" style={{ marginTop: 8 }}>
-                  {['level', 'health', 'speed', 'mana'].map(k => (
-                    <div key={k} className="stat-box">
-                      <div className="stat-label">{k}</div>
-                      <div className="stat-val" style={{ fontSize: 15 }}>{c[k] || 0}</div>
-                    </div>
-                  ))}
+                  <CountUpStat value={c.level || 0} label="level" />
+                  <CountUpStat value={c.health || 0} label="health" />
+                  <CountUpStat value={c.speed || 0} label="speed" />
+                  <CountUpStat value={c.mana || 0} label="mana" />
                 </div>
               </div>
             </div>
@@ -586,7 +628,7 @@ function OnlineTab({ online, stories, setModal }) {
       {reading.chapters?.length > 0 && <>
         <div className="section-label">Chapters</div>
         {reading.chapters.map((ch, idx) => (
-          <div key={ch.id} className="card">
+          <div key={ch.id} className="card stagger-item">
             <div style={{ fontFamily: 'Cinzel,serif', fontSize: 9, color: 'var(--text3)', letterSpacing: 2 }}>CHAPTER {idx + 1}</div>
             <div className="card-title" style={{ marginTop: 3 }}>{ch.title}</div>
             {ch.content && <div className="card-body">{ch.content}</div>}
@@ -603,29 +645,29 @@ function OnlineTab({ online, stories, setModal }) {
   )
 
   return (
-    <div>
+    <div className="screen-fade">
       <div className="online-hero">
         <h2>EvoTales Online</h2>
         <p>Share your stories or discover legends written by others across the realm.</p>
       </div>
-      <div className="online-btn" onClick={() => setModal('publish')}>
+      <div className="online-btn stagger-item" onClick={() => setModal('publish')}>
         <div className="online-btn-icon">⚔</div>
         <div>
           <div className="online-btn-title">Publish Your Story</div>
           <div className="online-btn-desc">Share a story from your library with all readers worldwide.</div>
         </div>
       </div>
-      <div className="online-btn" onClick={load}>
+      <div className="online-btn stagger-item" onClick={load}>
         <div className="online-btn-icon">📖</div>
         <div>
           <div className="online-btn-title">Discover Stories</div>
-          <div className="online-btn-desc">{loading ? 'Loading...' : `${published.length} published tales. Tap to refresh.`}</div>
+          <div className="online-btn-desc">{loading ? '⟳ Loading tales...' : `${published.length} published tales. Tap to refresh.`}</div>
         </div>
       </div>
       {published.length > 0 && <>
         <div className="section-label">Published Stories</div>
         {published.map(s => (
-          <div key={s.id} className="pub-card" onClick={() => setReading(s)}>
+          <div key={s.id} className="pub-card stagger-item" onClick={() => setReading(s)}>
             <div className="card-title">{s.title}</div>
             <div className="card-sub">{s.genre}</div>
             <div className="card-body" style={{ fontSize: 13 }}>{(s.description || '').slice(0, 120)}{s.description?.length > 120 ? '...' : ''}</div>
@@ -639,7 +681,7 @@ function OnlineTab({ online, stories, setModal }) {
   )
 }
 
-// ─── Main App ─────────────────────────────────────────────────────────────────
+// ── MAIN APP ───────────────────────────────────────────────────────────────
 export default function App() {
   const [tab, setTab] = useState('library')
   const [screen, setScreen] = useState('home')
@@ -665,32 +707,26 @@ export default function App() {
   const saveStories = s => { setStories(s); LS.set('evo_stories', s) }
   const showToast = msg => setToast(msg)
 
-  // live refs
   const story = stories.find(s => s.id === activeStory?.id)
   const chapter = story?.chapters?.find(c => c.id === activeChapter?.id)
   const part = chapter?.parts?.find(p => p.id === activePart?.id)
   const char = story?.characters?.find(c => c.id === activeChar?.id)
 
-  // ── Story ops
   const patchStory = (id, patch) => saveStories(stories.map(s => s.id === id ? { ...s, ...patch } : s))
-  const createStory = data => { saveStories([{ id: uid(), ...data, chapters: [], characters: [], createdAt: Date.now() }, ...stories]); showToast('Story created ✦') }
+  const createStory = data => { saveStories([{ id: uid(), ...data, chapters: [], characters: [], createdAt: Date.now() }, ...stories]); showToast('Story created') }
   const deleteStory = id => { saveStories(stories.filter(s => s.id !== id)); setScreen('home'); setActiveStory(null); showToast('Story deleted') }
 
-  // ── Chapter ops
   const patchChapter = (sId, cId, patch) => { const s = stories.find(x => x.id === sId); patchStory(sId, { chapters: s.chapters.map(c => c.id === cId ? { ...c, ...patch } : c) }) }
-  const createChapter = (title, sId) => { const s = stories.find(x => x.id === sId); patchStory(sId, { chapters: [...s.chapters, { id: uid(), title, parts: [], content: '', completed: false }] }); showToast('Chapter added ✦') }
+  const createChapter = (title, sId) => { const s = stories.find(x => x.id === sId); patchStory(sId, { chapters: [...s.chapters, { id: uid(), title, parts: [], content: '', completed: false }] }); showToast('Chapter added') }
   const deleteChapter = (sId, cId) => { const s = stories.find(x => x.id === sId); patchStory(sId, { chapters: s.chapters.filter(c => c.id !== cId) }); setScreen('story'); setActiveChapter(null); showToast('Chapter deleted') }
 
-  // ── Part ops
   const patchPart = (sId, cId, pId, patch) => { const s = stories.find(x => x.id === sId); const ch = s.chapters.find(c => c.id === cId); patchChapter(sId, cId, { parts: ch.parts.map(p => p.id === pId ? { ...p, ...patch } : p) }) }
-  const createPart = (title, sId, cId) => { const s = stories.find(x => x.id === sId); const ch = s.chapters.find(c => c.id === cId); patchChapter(sId, cId, { parts: [...ch.parts, { id: uid(), title, content: '' }] }); showToast('Part added ✦') }
+  const createPart = (title, sId, cId) => { const s = stories.find(x => x.id === sId); const ch = s.chapters.find(c => c.id === cId); patchChapter(sId, cId, { parts: [...ch.parts, { id: uid(), title, content: '' }] }); showToast('Part added') }
 
-  // ── Char ops
   const patchChar = (sId, charId, patch) => { const s = stories.find(x => x.id === sId); patchStory(sId, { characters: s.characters.map(c => c.id === charId ? { ...c, ...patch } : c) }) }
-  const createChar = (data, sId) => { const s = stories.find(x => x.id === sId); patchStory(sId, { characters: [...s.characters, { id: uid(), ...data, chapterStats: {} }] }); showToast('Character created ✦') }
+  const createChar = (data, sId) => { const s = stories.find(x => x.id === sId); patchStory(sId, { characters: [...s.characters, { id: uid(), ...data, chapterStats: {} }] }); showToast('Character created') }
   const deleteChar = (sId, charId) => { const s = stories.find(x => x.id === sId); patchStory(sId, { characters: s.characters.filter(c => c.id !== charId) }); setScreen('story'); setActiveChar(null); showToast('Character removed') }
 
-  // ── Publish
   const publishStory = async sId => {
     if (!db) { showToast('Firebase unavailable'); return }
     const s = stories.find(x => x.id === sId)
@@ -700,18 +736,33 @@ export default function App() {
         type: s.type, chapters: s.chapters || [], characters: s.characters || [],
         publishedAt: Date.now()
       })
-      showToast('Published! ✦')
+      showToast('Published to Online')
       setModal(null)
-    } catch (e) { showToast('Publish failed: ' + e.message) }
+    } catch (e) { showToast('Publish failed') }
   }
 
   const switchTab = t => { setTab(t); setScreen('home'); setActiveStory(null); setActiveChapter(null); setActivePart(null); setActiveChar(null) }
 
   const showFab = tab === 'library' && (screen === 'home' || (screen === 'story' && story?.type === 'chapters') || screen === 'chapter')
-  const fabAction = () => { if (screen === 'home') setModal('newStory'); else if (screen === 'story') setModal('newChapter'); else if (screen === 'chapter') setModal('newPart') }
+  const fabLabel = screen === 'home' ? '✦' : '+'
+  const fabAction = () => {
+    if (screen === 'home') setModal('newStory')
+    else if (screen === 'story') setModal('newChapter')
+    else if (screen === 'chapter') setModal('newPart')
+  }
+
+  // Story card click handler (delegated)
+  const handleStoryClick = useCallback((e) => {
+    const card = e.target.closest('[id^="story-"]')
+    if (card) {
+      const id = card.id.replace('story-', '')
+      const s = stories.find(x => x.id === id)
+      if (s) { setActiveStory(s); setScreen('story') }
+    }
+  }, [stories])
 
   const renderScreen = () => {
-    if (screen === 'home') return <StoryList stories={stories} onOpen={s => { setActiveStory(s); setScreen('story') }} />
+    if (screen === 'home') return <div onClick={handleStoryClick}><StoryList stories={stories} /></div>
     if (screen === 'story' && story) return <StoryScreen story={story} onBack={() => setScreen('home')} onChapter={ch => { setActiveChapter(ch); setScreen('chapter') }} onChar={c => { setActiveChar(c); setScreen('charDetail') }} onEdit={patch => patchStory(story.id, patch)} setModal={setModal} setDelTarget={setDelTarget} onDeleteStory={() => deleteStory(story.id)} />
     if (screen === 'chapter' && chapter) return <ChapterScreen story={story} chapter={chapter} onBack={() => setScreen('story')} onPart={p => { setActivePart(p); setScreen('part') }} onToggleComplete={() => patchChapter(story.id, chapter.id, { completed: !chapter.completed })} setModal={setModal} onUpdateChapter={patch => patchChapter(story.id, chapter.id, patch)} setDelTarget={setDelTarget} onDeleteChapter={() => deleteChapter(story.id, chapter.id)} />
     if (screen === 'part' && part) return <PartScreen story={story} chapter={chapter} part={part} onBack={() => setScreen('chapter')} onUpdate={patch => patchPart(story.id, chapter.id, part.id, patch)} />
@@ -722,6 +773,8 @@ export default function App() {
   return (
     <div className="app">
       <div className="app-bg" />
+      <RuneField />
+
       <nav className="nav">
         <div>
           <div className="nav-logo">EvoTales</div>
@@ -745,7 +798,7 @@ export default function App() {
         {tab === 'library' ? renderScreen() : <OnlineTab online={online} stories={stories} setModal={setModal} />}
       </div>
 
-      {showFab && <button className="fab" onClick={fabAction}>{screen === 'home' ? '✦' : '+'}</button>}
+      {showFab && <button className="fab" onClick={fabAction}>{fabLabel}</button>}
 
       {modal === 'newStory' && <NewStoryModal onClose={() => setModal(null)} onCreate={createStory} />}
       {modal === 'newChapter' && story && <NewChapterModal onClose={() => setModal(null)} onCreate={t => createChapter(t, story.id)} />}
