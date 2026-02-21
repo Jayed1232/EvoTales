@@ -1,414 +1,176 @@
-import { Camera, Mesh, Plane, Program, Renderer, Texture, Transform } from 'ogl';
-import { useEffect, useRef } from 'react';
+import { useRef, useState, useEffect } from 'react'
+import { AFF_CLR, GRADE_CLR } from './constants.js'
 
-// CSS inline so no separate file needed
-const GALLERY_STYLE = `
-.circular-gallery { width: 100%; height: 100%; overflow: hidden; }
-`;
+// ── PURE CSS HORIZONTAL DRAG CAROUSEL ─────────────────────────────────────
+// No external dependencies — works everywhere
 
-function injectStyle() {
-  if (document.getElementById('cg-style')) return;
-  const s = document.createElement('style');
-  s.id = 'cg-style';
-  s.textContent = GALLERY_STYLE;
-  document.head.appendChild(s);
-}
+function CharCard({ card }) {
+  const { name, level, grade, affinities, skills, stats } = card
+  const gradeClr = GRADE_CLR[grade] || '#c9a84c'
 
-function debounce(func, wait) {
-  let timeout;
-  return function (...args) {
-    clearTimeout(timeout);
-    timeout = setTimeout(() => func.apply(this, args), wait);
-  };
-}
+  return (
+    <div style={{
+      width: 200, height: 320, flexShrink: 0,
+      background: 'linear-gradient(160deg,#1a1530 0%,#0d0a1a 100%)',
+      border: '1px solid rgba(201,168,76,0.4)',
+      borderRadius: 14, padding: 14, position: 'relative',
+      overflow: 'hidden', userSelect: 'none',
+      boxShadow: '0 8px 32px rgba(0,0,0,0.5), 0 0 20px rgba(201,168,76,0.05)',
+      transition: 'transform 0.2s, box-shadow 0.2s',
+    }}
+      onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-6px) scale(1.03)'; e.currentTarget.style.boxShadow = '0 16px 48px rgba(0,0,0,0.6),0 0 30px rgba(201,168,76,0.2)' }}
+      onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '0 8px 32px rgba(0,0,0,0.5),0 0 20px rgba(201,168,76,0.05)' }}
+    >
+      {/* Top gold shimmer line */}
+      <div style={{ position: 'absolute', top: 0, left: '15%', right: '15%', height: 1, background: 'linear-gradient(90deg,transparent,#f0c060,transparent)' }} />
 
-function lerp(p1, p2, t) { return p1 + (p2 - p1) * t; }
+      {/* Avatar */}
+      <div style={{ width: 64, height: 64, borderRadius: '50%', margin: '0 auto 8px', background: 'radial-gradient(circle at 40% 35%,#9b3dab,#2d1550)', border: '2px solid rgba(201,168,76,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, fontFamily: 'Cinzel,serif', color: '#f0c060', boxShadow: '0 0 20px rgba(123,45,139,0.5)' }}>
+        {(name || '?')[0].toUpperCase()}
+      </div>
 
-function autoBind(instance) {
-  const proto = Object.getPrototypeOf(instance);
-  Object.getOwnPropertyNames(proto).forEach(key => {
-    if (key !== 'constructor' && typeof instance[key] === 'function') {
-      instance[key] = instance[key].bind(instance);
-    }
-  });
-}
+      {/* Name */}
+      <div style={{ textAlign: 'center', fontFamily: 'Cinzel,serif', fontSize: 13, fontWeight: 700, color: '#f0c060', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>
 
-// ── RENDER A CHARACTER CARD TO CANVAS ─────────────────────────────────────
-function createCharCardTexture(gl, card) {
-  const W = 400, H = 560;
-  const canvas = document.createElement('canvas');
-  canvas.width = W; canvas.height = H;
-  const c = canvas.getContext('2d');
+      {/* Grade + Level */}
+      <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginBottom: 8 }}>
+        <span style={{ fontSize: 9, fontFamily: 'Cinzel,serif', color: gradeClr, textShadow: `0 0 8px ${gradeClr}`, letterSpacing: 0.5 }}>{grade}</span>
+        <span style={{ fontSize: 9, fontFamily: 'Cinzel,serif', color: 'var(--text3)', letterSpacing: 1 }}>LVL {level || 1}</span>
+      </div>
 
-  // Background gradient
-  const bg = c.createLinearGradient(0, 0, 0, H);
-  bg.addColorStop(0, '#1a1530');
-  bg.addColorStop(1, '#0d0a1a');
-  c.fillStyle = bg;
-  c.roundRect(0, 0, W, H, 18); c.fill();
+      {/* Divider */}
+      <div style={{ height: 1, background: 'rgba(201,168,76,0.15)', marginBottom: 8 }} />
 
-  // Outer border glow
-  c.strokeStyle = 'rgba(201,168,76,0.55)';
-  c.lineWidth = 1.5;
-  c.roundRect(1, 1, W - 2, H - 2, 17); c.stroke();
+      {/* Stats */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, marginBottom: 6 }}>
+        {[['HP', (stats?.hp || 0).toLocaleString()], ['MP', (stats?.mana || 0).toLocaleString()], ['SPD', stats?.speed || 0]].map(([k, v]) => (
+          <div key={k} style={{ textAlign: 'center', background: 'rgba(0,0,0,0.2)', borderRadius: 6, padding: '4px 2px', border: '1px solid rgba(201,168,76,0.1)' }}>
+            <div style={{ fontSize: 7, fontFamily: 'Cinzel,serif', color: 'var(--text3)', letterSpacing: 1 }}>{k}</div>
+            <div style={{ fontSize: 10, fontFamily: 'Cinzel,serif', color: '#f0c060', fontWeight: 700 }}>{v}</div>
+          </div>
+        ))}
+      </div>
 
-  // Top electric line
-  const tl = c.createLinearGradient(0, 0, W, 0);
-  tl.addColorStop(0, 'transparent');
-  tl.addColorStop(0.5, '#f0c060');
-  tl.addColorStop(1, 'transparent');
-  c.strokeStyle = tl; c.lineWidth = 2;
-  c.beginPath(); c.moveTo(20, 2); c.lineTo(W - 20, 2); c.stroke();
+      {/* ATK note */}
+      <div style={{ fontSize: 8, color: '#4a4270', fontFamily: 'Cinzel,serif', textAlign: 'center', marginBottom: 8 }}>⚔ ATK via skills</div>
 
-  // Avatar circle
-  const cx = W / 2, cy = 100;
-  const rad = c.createRadialGradient(cx, cy, 0, cx, cy, 65);
-  rad.addColorStop(0, '#9b3dab'); rad.addColorStop(1, '#2d1550');
-  c.fillStyle = rad;
-  c.beginPath(); c.arc(cx, cy, 62, 0, Math.PI * 2); c.fill();
-  c.strokeStyle = 'rgba(201,168,76,0.9)'; c.lineWidth = 2;
-  c.beginPath(); c.arc(cx, cy, 62, 0, Math.PI * 2); c.stroke();
+      {/* Divider */}
+      <div style={{ height: 1, background: 'rgba(201,168,76,0.1)', marginBottom: 6 }} />
 
-  // Avatar letter
-  c.fillStyle = '#f0c060';
-  c.font = 'bold 52px serif';
-  c.textAlign = 'center'; c.textBaseline = 'middle';
-  c.fillText((card.name || '?')[0].toUpperCase(), cx, cy);
+      {/* Affinities */}
+      {(affinities || []).length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 6, justifyContent: 'center' }}>
+          {(affinities || []).slice(0, 4).map(a => (
+            <span key={a} style={{ fontSize: 8, padding: '1px 6px', borderRadius: 10, border: `1px solid ${AFF_CLR[a] || '#c9a84c'}`, color: AFF_CLR[a] || '#c9a84c', background: `${AFF_CLR[a]}15` || 'transparent', fontFamily: 'Cinzel,serif' }}>{a}</span>
+          ))}
+        </div>
+      )}
 
-  // Name
-  c.fillStyle = '#f0c060';
-  c.font = 'bold 22px serif';
-  c.textAlign = 'center'; c.textBaseline = 'top';
-  c.fillText(card.name || 'Unknown', cx, 178);
-
-  // Grade + Level row
-  const gradeClr = card.gradeColor || '#c9a84c';
-  c.fillStyle = gradeClr;
-  c.shadowColor = gradeClr; c.shadowBlur = 8;
-  c.font = '13px monospace';
-  c.fillText(card.grade || '', cx - 40, 206);
-  c.shadowBlur = 0;
-  c.fillStyle = '#9d95c0';
-  c.font = '11px monospace';
-  c.fillText(`LVL ${card.level || 1}`, cx + 52, 206);
-
-  // Divider
-  c.strokeStyle = 'rgba(201,168,76,0.2)'; c.lineWidth = 1;
-  c.beginPath(); c.moveTo(20, 228); c.lineTo(W - 20, 228); c.stroke();
-
-  // STATS section
-  c.fillStyle = '#6b6390'; c.font = '10px monospace'; c.textAlign = 'left';
-  c.fillText('STATS', 20, 242);
-  const stats = card.stats || {};
-  const statItems = [['HP', (stats.hp || 0).toLocaleString()], ['MANA', (stats.mana || 0).toLocaleString()], ['SPD', stats.speed || 0]];
-  statItems.forEach(([label, val], i) => {
-    const sx = 20 + i * 126;
-    c.fillStyle = '#6b6390'; c.font = '9px monospace'; c.textAlign = 'left';
-    c.fillText(label, sx, 258);
-    c.fillStyle = '#f0c060'; c.font = 'bold 14px monospace';
-    c.fillText(val, sx, 275);
-  });
-
-  // ATK note
-  c.fillStyle = '#4a4270'; c.font = '10px serif'; c.textAlign = 'center';
-  c.fillText('⚔ ATK determined by skills', cx, 295);
-
-  // Divider
-  c.strokeStyle = 'rgba(201,168,76,0.15)'; c.lineWidth = 1;
-  c.beginPath(); c.moveTo(20, 308); c.lineTo(W - 20, 308); c.stroke();
-
-  // AFFINITIES section
-  c.fillStyle = '#6b6390'; c.font = '10px monospace'; c.textAlign = 'left';
-  c.fillText('AFFINITIES', 20, 322);
-  let ax = 20;
-  (card.affinities || []).slice(0, 5).forEach(aff => {
-    const clr = (card.affColors && card.affColors[aff]) || '#c9a84c';
-    c.font = '10px monospace';
-    const tw = c.measureText(aff).width + 14;
-    c.fillStyle = clr + '25'; c.strokeStyle = clr; c.lineWidth = 1;
-    c.beginPath(); c.roundRect(ax, 332, tw, 18, 9); c.fill(); c.stroke();
-    c.fillStyle = clr; c.textAlign = 'center';
-    c.fillText(aff, ax + tw / 2, 344);
-    ax += tw + 6;
-  });
-  if (!(card.affinities || []).length) {
-    c.fillStyle = '#3d3465'; c.font = '11px serif'; c.textAlign = 'center';
-    c.fillText('None', cx, 344);
-  }
-
-  // Divider
-  c.strokeStyle = 'rgba(201,168,76,0.15)'; c.lineWidth = 1;
-  c.beginPath(); c.moveTo(20, 362); c.lineTo(W - 20, 362); c.stroke();
-
-  // SKILLS section
-  c.fillStyle = '#6b6390'; c.font = '10px monospace'; c.textAlign = 'left';
-  c.fillText('SKILLS', 20, 376);
-  const skills = card.skills || [];
-  if (!skills.length) {
-    c.fillStyle = '#3d3465'; c.font = '11px serif'; c.textAlign = 'center';
-    c.fillText('No skills yet', cx, 400);
-  } else {
-    skills.slice(0, 5).forEach((sk, i) => {
-      const sy = 390 + i * 26;
-      const clr = (card.affColors && card.affColors[sk.element]) || '#c9a84c';
-      // Skill row bg
-      c.fillStyle = 'rgba(255,255,255,0.03)';
-      c.beginPath(); c.roundRect(18, sy - 10, W - 36, 20, 4); c.fill();
-      // Left accent
-      c.fillStyle = clr;
-      c.beginPath(); c.roundRect(18, sy - 10, 3, 20, 2); c.fill();
-      // Skill name
-      c.fillStyle = '#e8e0ff'; c.font = '12px serif'; c.textAlign = 'left';
-      c.fillText(sk.name, 28, sy + 2);
-      // Element + level badge
-      c.fillStyle = clr; c.font = 'bold 9px monospace'; c.textAlign = 'right';
-      c.fillText(`${sk.element} Lv.${sk.level}`, W - 22, sy + 2);
-    });
-    if (skills.length > 5) {
-      c.fillStyle = '#6b6390'; c.font = '10px monospace'; c.textAlign = 'center';
-      c.fillText(`+${skills.length - 5} more`, cx, 390 + 5 * 26 + 4);
-    }
-  }
-
-  const texture = new Texture(gl, { generateMipmaps: false });
-  texture.image = canvas;
-  return { texture, width: W, height: H };
-}
-
-class Title {
-  constructor({ gl, plane, renderer, text, textColor = '#f0c060', font = 'bold 24px serif' }) {
-    autoBind(this);
-    this.gl = gl; this.plane = plane; this.renderer = renderer;
-    this.text = text; this.textColor = textColor; this.font = font;
-    this.createMesh();
-  }
-  createMesh() {
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    ctx.font = this.font;
-    const metrics = ctx.measureText(this.text);
-    const tw = Math.ceil(metrics.width);
-    const th = Math.ceil(parseInt(this.font) * 1.4);
-    canvas.width = tw + 24; canvas.height = th + 16;
-    ctx.font = this.font;
-    ctx.fillStyle = this.textColor;
-    ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
-    ctx.fillText(this.text, canvas.width / 2, canvas.height / 2);
-    const texture = new Texture(this.gl, { generateMipmaps: false });
-    texture.image = canvas;
-    const geometry = new Plane(this.gl);
-    const program = new Program(this.gl, {
-      vertex: `attribute vec3 position;attribute vec2 uv;uniform mat4 modelViewMatrix;uniform mat4 projectionMatrix;varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`,
-      fragment: `precision highp float;uniform sampler2D tMap;varying vec2 vUv;void main(){vec4 color=texture2D(tMap,vUv);if(color.a<0.1)discard;gl_FragColor=color;}`,
-      uniforms: { tMap: { value: texture } },
-      transparent: true
-    });
-    this.mesh = new Mesh(this.gl, { geometry, program });
-    const aspect = canvas.width / canvas.height;
-    const textHeight = this.plane.scale.y * 0.12;
-    this.mesh.scale.set(textHeight * aspect, textHeight, 1);
-    this.mesh.position.y = -this.plane.scale.y * 0.5 - textHeight * 0.5 - 0.04;
-    this.mesh.setParent(this.plane);
-  }
-}
-
-class Media {
-  constructor({ geometry, gl, card, index, length, renderer, scene, screen, viewport, bend, borderRadius = 0.05 }) {
-    this.extra = 0;
-    this.geometry = geometry; this.gl = gl; this.card = card;
-    this.index = index; this.length = length; this.renderer = renderer;
-    this.scene = scene; this.screen = screen; this.viewport = viewport;
-    this.bend = bend; this.borderRadius = borderRadius;
-    this.createShader();
-    this.createMesh();
-    this.createTitle();
-    this.onResize();
-  }
-  createShader() {
-    const { texture } = createCharCardTexture(this.gl, this.card);
-    this.program = new Program(this.gl, {
-      depthTest: false, depthWrite: false,
-      vertex: `
-        precision highp float;
-        attribute vec3 position; attribute vec2 uv;
-        uniform mat4 modelViewMatrix; uniform mat4 projectionMatrix;
-        uniform float uTime; uniform float uSpeed;
-        varying vec2 vUv;
-        void main() {
-          vUv = uv;
-          vec3 p = position;
-          p.z = (sin(p.x * 4.0 + uTime) * 1.5 + cos(p.y * 2.0 + uTime) * 1.5) * (0.1 + uSpeed * 0.5);
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
-        }
-      `,
-      fragment: `
-        precision highp float;
-        uniform sampler2D tMap;
-        uniform float uBorderRadius;
-        uniform vec2 uPlaneSizes;
-        varying vec2 vUv;
-        float roundedBoxSDF(vec2 p, vec2 b, float r) {
-          vec2 d = abs(p) - b;
-          return length(max(d, vec2(0.0))) + min(max(d.x, d.y), 0.0) - r;
-        }
-        void main() {
-          vec4 color = texture2D(tMap, vUv);
-          float d = roundedBoxSDF(vUv - 0.5, vec2(0.5 - uBorderRadius), uBorderRadius);
-          float alpha = 1.0 - smoothstep(-0.002, 0.002, d);
-          gl_FragColor = vec4(color.rgb, color.a * alpha);
-        }
-      `,
-      uniforms: {
-        tMap: { value: texture },
-        uBorderRadius: { value: this.borderRadius },
-        uPlaneSizes: { value: [0, 0] },
-        uSpeed: { value: 0 },
-        uTime: { value: 100 * Math.random() }
-      },
-      transparent: true
-    });
-  }
-  createMesh() {
-    this.plane = new Mesh(this.gl, { geometry: this.geometry, program: this.program });
-    this.plane.setParent(this.scene);
-  }
-  createTitle() {
-    this.title = new Title({
-      gl: this.gl, plane: this.plane, renderer: this.renderer,
-      text: this.card.name || '?', textColor: '#f0c060', font: 'bold 24px serif'
-    });
-  }
-  update(scroll, direction) {
-    this.plane.position.x = this.x - scroll.current - this.extra;
-    const x = this.plane.position.x;
-    const H = this.viewport.width / 2;
-    if (this.bend === 0) {
-      this.plane.position.y = 0; this.plane.rotation.z = 0;
-    } else {
-      const B_abs = Math.abs(this.bend);
-      const R = (H * H + B_abs * B_abs) / (2 * B_abs);
-      const effectiveX = Math.min(Math.abs(x), H);
-      const arc = R - Math.sqrt(R * R - effectiveX * effectiveX);
-      if (this.bend > 0) {
-        this.plane.position.y = -arc;
-        this.plane.rotation.z = -Math.sign(x) * Math.asin(effectiveX / R);
-      } else {
-        this.plane.position.y = arc;
-        this.plane.rotation.z = Math.sign(x) * Math.asin(effectiveX / R);
+      {/* Skills */}
+      <div style={{ fontSize: 8, fontFamily: 'Cinzel,serif', color: 'var(--text3)', letterSpacing: 1, marginBottom: 4 }}>SKILLS</div>
+      {(skills || []).length === 0
+        ? <div style={{ fontSize: 10, color: '#3d3465', textAlign: 'center', fontFamily: 'Cinzel,serif' }}>No skills</div>
+        : (skills || []).slice(0, 3).map(sk => (
+          <div key={sk.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3, padding: '2px 0 2px 6px', borderLeft: `2px solid ${AFF_CLR[sk.element] || '#c9a84c'}` }}>
+            <span style={{ fontSize: 9, color: '#e8e0ff', fontFamily: 'Cinzel,serif', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sk.name}</span>
+            <span style={{ fontSize: 8, color: AFF_CLR[sk.element] || '#c9a84c', fontFamily: 'Cinzel,serif', marginLeft: 4, whiteSpace: 'nowrap' }}>Lv.{sk.level}</span>
+          </div>
+        ))
       }
+      {(skills || []).length > 3 && <div style={{ fontSize: 8, color: '#6b6390', textAlign: 'center', fontFamily: 'Cinzel,serif' }}>+{skills.length - 3} more</div>}
+
+      {/* Bottom glow */}
+      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 40, background: `linear-gradient(to top,${gradeClr}08,transparent)`, pointerEvents: 'none' }} />
+    </div>
+  )
+}
+
+export default function CharacterGallery({ cards = [] }) {
+  const trackRef = useRef(null)
+  const isDragging = useRef(false)
+  const startX = useRef(0)
+  const scrollLeft = useRef(0)
+  const velRef = useRef(0)
+  const lastX = useRef(0)
+  const rafRef = useRef(null)
+
+  // Duplicate cards for infinite feel
+  const displayCards = cards.length > 0 ? [...cards, ...cards, ...cards] : []
+
+  const onDown = (e) => {
+    isDragging.current = true
+    startX.current = (e.touches ? e.touches[0].clientX : e.clientX)
+    scrollLeft.current = trackRef.current.scrollLeft
+    lastX.current = startX.current
+    velRef.current = 0
+    cancelAnimationFrame(rafRef.current)
+    if (trackRef.current) trackRef.current.style.cursor = 'grabbing'
+  }
+
+  const onMove = (e) => {
+    if (!isDragging.current) return
+    const x = e.touches ? e.touches[0].clientX : e.clientX
+    velRef.current = x - lastX.current
+    lastX.current = x
+    const walk = (startX.current - x) * 1.2
+    trackRef.current.scrollLeft = scrollLeft.current + walk
+  }
+
+  const onUp = () => {
+    isDragging.current = false
+    if (trackRef.current) trackRef.current.style.cursor = 'grab'
+    // Momentum
+    const decel = () => {
+      velRef.current *= 0.92
+      if (trackRef.current) trackRef.current.scrollLeft -= velRef.current
+      if (Math.abs(velRef.current) > 0.5) rafRef.current = requestAnimationFrame(decel)
     }
-    this.program.uniforms.uTime.value += 0.04;
-    this.program.uniforms.uSpeed.value = scroll.current - scroll.last;
-    const planeOffset = this.plane.scale.x / 2;
-    const viewportOffset = this.viewport.width / 2;
-    this.isBefore = this.plane.position.x + planeOffset < -viewportOffset;
-    this.isAfter = this.plane.position.x - planeOffset > viewportOffset;
-    if (direction === 'right' && this.isBefore) { this.extra -= this.widthTotal; this.isBefore = this.isAfter = false; }
-    if (direction === 'left' && this.isAfter) { this.extra += this.widthTotal; this.isBefore = this.isAfter = false; }
+    rafRef.current = requestAnimationFrame(decel)
   }
-  onResize({ screen, viewport } = {}) {
-    if (screen) this.screen = screen;
-    if (viewport) { this.viewport = viewport; if (this.program.uniforms.uPlaneSizes) this.program.uniforms.uPlaneSizes.value = [this.viewport.width, this.viewport.height]; }
-    this.scale = this.screen.height / 1500;
-    this.plane.scale.y = (this.viewport.height * (900 * this.scale)) / this.screen.height;
-    this.plane.scale.x = (this.viewport.width * (700 * this.scale)) / this.screen.width;
-    this.program.uniforms.uPlaneSizes.value = [this.plane.scale.x, this.plane.scale.y];
-    this.padding = 2;
-    this.width = this.plane.scale.x + this.padding;
-    this.widthTotal = this.width * this.length;
-    this.x = this.width * this.index;
-  }
-}
 
-class App {
-  constructor(container, { cards, bend = 3, borderRadius = 0.05, scrollSpeed = 2, scrollEase = 0.05 } = {}) {
-    this.container = container;
-    this.scrollSpeed = scrollSpeed;
-    this.scroll = { ease: scrollEase, current: 0, target: 0, last: 0 };
-    this.onCheckDebounce = debounce(this.onCheck.bind(this), 200);
-    this.createRenderer();
-    this.createCamera();
-    this.createScene();
-    this.onResize();
-    this.createGeometry();
-    this.createMedias(cards, bend, borderRadius);
-    this.update();
-    this.addEventListeners();
+  // Infinite scroll: reset position when near edges
+  const onScroll = () => {
+    if (!trackRef.current || cards.length === 0) return
+    const el = trackRef.current
+    const cardW = 216 // 200 + 16 gap
+    const totalOneSet = cardW * cards.length
+    // If scrolled past 2 sets, reset to 1 set mark
+    if (el.scrollLeft >= totalOneSet * 2) el.scrollLeft -= totalOneSet
+    // If scrolled before 1 set, reset to 1 set mark
+    if (el.scrollLeft <= 0) el.scrollLeft += totalOneSet
   }
-  createRenderer() {
-    this.renderer = new Renderer({ alpha: true, antialias: true, dpr: Math.min(window.devicePixelRatio || 1, 2) });
-    this.gl = this.renderer.gl;
-    this.gl.clearColor(0, 0, 0, 0);
-    this.container.appendChild(this.gl.canvas);
-  }
-  createCamera() { this.camera = new Camera(this.gl); this.camera.fov = 45; this.camera.position.z = 20; }
-  createScene() { this.scene = new Transform(); }
-  createGeometry() { this.planeGeometry = new Plane(this.gl, { heightSegments: 50, widthSegments: 100 }); }
-  createMedias(cards = [], bend, borderRadius) {
-    const doubled = [...cards, ...cards];
-    this.mediasCards = doubled;
-    this.medias = doubled.map((card, index) => new Media({
-      geometry: this.planeGeometry, gl: this.gl, card,
-      index, length: doubled.length,
-      renderer: this.renderer, scene: this.scene,
-      screen: this.screen, viewport: this.viewport,
-      bend, borderRadius
-    }));
-  }
-  onTouchDown(e) { this.isDown = true; this.scroll.position = this.scroll.current; this.start = e.touches ? e.touches[0].clientX : e.clientX; }
-  onTouchMove(e) { if (!this.isDown) return; const x = e.touches ? e.touches[0].clientX : e.clientX; this.scroll.target = this.scroll.position + (this.start - x) * (this.scrollSpeed * 0.025); }
-  onTouchUp() { this.isDown = false; this.onCheck(); }
-  onWheel(e) { const delta = e.deltaY || e.wheelDelta || e.detail; this.scroll.target += (delta > 0 ? this.scrollSpeed : -this.scrollSpeed) * 0.2; this.onCheckDebounce(); }
-  onCheck() {
-    if (!this.medias?.[0]) return;
-    const width = this.medias[0].width;
-    const itemIndex = Math.round(Math.abs(this.scroll.target) / width);
-    const item = width * itemIndex;
-    this.scroll.target = this.scroll.target < 0 ? -item : item;
-  }
-  onResize() {
-    this.screen = { width: this.container.clientWidth, height: this.container.clientHeight };
-    this.renderer.setSize(this.screen.width, this.screen.height);
-    this.camera.perspective({ aspect: this.screen.width / this.screen.height });
-    const fov = (this.camera.fov * Math.PI) / 180;
-    const height = 2 * Math.tan(fov / 2) * this.camera.position.z;
-    this.viewport = { width: height * this.camera.aspect, height };
-    this.medias?.forEach(m => m.onResize({ screen: this.screen, viewport: this.viewport }));
-  }
-  update() {
-    this.scroll.current = lerp(this.scroll.current, this.scroll.target, this.scroll.ease);
-    const direction = this.scroll.current > this.scroll.last ? 'right' : 'left';
-    this.medias?.forEach(m => m.update(this.scroll, direction));
-    this.renderer.render({ scene: this.scene, camera: this.camera });
-    this.scroll.last = this.scroll.current;
-    this.raf = requestAnimationFrame(this.update.bind(this));
-  }
-  addEventListeners() {
-    this.boundOnResize = this.onResize.bind(this);
-    window.addEventListener('resize', this.boundOnResize);
-    window.addEventListener('mousewheel', this.onWheel.bind(this));
-    window.addEventListener('wheel', this.onWheel.bind(this));
-    window.addEventListener('mousedown', this.onTouchDown.bind(this));
-    window.addEventListener('mousemove', this.onTouchMove.bind(this));
-    window.addEventListener('mouseup', this.onTouchUp.bind(this));
-    this.container.addEventListener('touchstart', this.onTouchDown.bind(this));
-    this.container.addEventListener('touchmove', this.onTouchMove.bind(this));
-    this.container.addEventListener('touchend', this.onTouchUp.bind(this));
-  }
-  destroy() {
-    cancelAnimationFrame(this.raf);
-    window.removeEventListener('resize', this.boundOnResize);
-    if (this.gl?.canvas?.parentNode) this.gl.canvas.parentNode.removeChild(this.gl.canvas);
-  }
-}
 
-export default function CircularGallery({ cards = [], bend = 3, borderRadius = 0.05, scrollSpeed = 2, scrollEase = 0.05 }) {
-  const containerRef = useRef(null);
   useEffect(() => {
-    injectStyle();
-    if (!containerRef.current || !cards.length) return;
-    const app = new App(containerRef.current, { cards, bend, borderRadius, scrollSpeed, scrollEase });
-    return () => app.destroy();
-  }, [JSON.stringify(cards), bend]);
-  return <div className="circular-gallery" ref={containerRef} style={{ width: '100%', height: '100%' }} />;
+    const el = trackRef.current
+    if (!el || cards.length === 0) return
+    // Start in the middle set
+    const cardW = 216
+    el.scrollLeft = cardW * cards.length
+    return () => cancelAnimationFrame(rafRef.current)
+  }, [cards.length])
+
+  if (!cards.length) return null
+
+  return (
+    <div style={{ position: 'relative', width: '100%', overflow: 'hidden' }}>
+      {/* Fade edges */}
+      <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 40, background: 'linear-gradient(90deg,var(--bg),transparent)', zIndex: 2, pointerEvents: 'none' }} />
+      <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 40, background: 'linear-gradient(270deg,var(--bg),transparent)', zIndex: 2, pointerEvents: 'none' }} />
+
+      <div
+        ref={trackRef}
+        onMouseDown={onDown} onMouseMove={onMove} onMouseUp={onUp} onMouseLeave={onUp}
+        onTouchStart={onDown} onTouchMove={onMove} onTouchEnd={onUp}
+        onScroll={onScroll}
+        style={{
+          display: 'flex', gap: 16, overflowX: 'scroll', padding: '12px 40px 20px',
+          cursor: 'grab', scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch',
+          userSelect: 'none',
+        }}
+      >
+        <style>{`.char-gallery-track::-webkit-scrollbar{display:none}`}</style>
+        {displayCards.map((card, i) => <CharCard key={`${card.name}-${i}`} card={card} />)}
+      </div>
+    </div>
+  )
 }
