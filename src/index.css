@@ -250,7 +250,7 @@ html,body{height:100%;background:#040310;color:var(--text);font-family:'Crimson 
 .pub-card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent);background-size:200% 100%;animation:electricFlow 4s linear infinite}
 
 /* READER PAGE */
-.reader-page{position:fixed;padding-top:60px;inset:0;background:var(--bg);z-index:200;overflow-y:auto;animation:fadeIn .3s ease}
+.reader-page{position:fixed;padding-top:110px;inset:0;background:var(--bg);z-index:200;overflow-y:auto;animation:fadeIn .3s ease}
 .reader-nav{position:fixed;top:0;left:0;right:0;z-index:999;display:flex;align-items:center;gap:12px;padding:14px 20px;background:rgba(13,10,26,0.97);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:10;backdrop-filter:blur(12px)}
 .reader-nav::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--gold),var(--cyan),var(--gold),transparent);background-size:200% 100%;animation:electricFlow 4s linear infinite}
 .reader-title{font-family:'Cinzel Decorative',serif;font-size:14px;color:var(--gold2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:linear-gradient(90deg,var(--gold),var(--gold3),#fff,var(--gold3),var(--gold));background-size:200% auto;-webkit-background-clip:text;-webkit-text-fill-color:transparent;animation:shimmer 5s linear infinite}
