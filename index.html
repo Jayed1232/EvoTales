@@ -9,6 +9,13 @@
     <link rel="apple-touch-icon" href="./icon-192.png" />
     <link rel="manifest" href="./manifest.json" />
     <title>EvoTales</title>
+    <link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#07050f">
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js')
+  }
+</script>
   </head>
   <body>
     <div id="root"></div>
