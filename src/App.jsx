@@ -1002,7 +1002,7 @@ fetch('https://www.google.com/favicon.ico',{mode:'no-cors',cache:'no-store'}).th
         <div className={'status-badge '+(online?'s-online':'s-offline')}><div className="sdot"/>{online?'Online':'Offline'}</div>
       </nav>
       <div className="tabs">
-        {['library','online'].map(t => <button key={t} className={'tab '+(tab===t?'active':'')} onClick={() => { if(t==='online'&&!online) return; switchTab(t) }} style={t==='online'&&!online?{opacity:0.4,cursor:'not-allowed'}:{}}>
+        {['library','online'].map(t => <button key={t} className={'tab '+(tab===t?'active':'')} onClick={() => { if(t==='online'&&!online) return; switchTab(t) }} style={t==='online'&&!online?{opacity:0.4,cursor:'not-allowed'}:{}}>{t==='library'?'📚 Library':'🌐 Online'}</button>)}
       </div>
       <div className="content">{tab==='library'?renderScreen():<OnlineTab online={online} stories={stories} setModal={setModal}/>}</div>
       {showFab&&<MagnetBtn className="fab" onClick={fabAction}>{screen==='home'?'✦':'+'}</MagnetBtn>}
