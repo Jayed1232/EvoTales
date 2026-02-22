@@ -769,9 +769,9 @@ function ReaderPage({ story, onClose }) {
     gradeColor:GRADE_CLR[c.grade]||'#c9a84c',affColors:AFF_CLR,_ref:c
   }))
 
-  const ReaderNav = ({ title, onPressBack, backLabel }) => (
+  const ReaderNav = ({ title, onPressBack }) => (
     <div className="reader-nav">
-      <button className="back-btn" onClick={onPressBack}>←</button>
+      <button onClick={onPressBack} style={{background:'rgba(201,168,76,0.12)',border:'1px solid rgba(201,168,76,0.3)',borderRadius:20,padding:'6px 16px',fontFamily:'Cinzel,serif',fontSize:12,color:'var(--gold2)',cursor:'pointer',letterSpacing:1,flexShrink:0}}>← Back</button>
       <div className="reader-title">{title}</div>
     </div>
   )
