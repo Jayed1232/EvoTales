@@ -281,7 +281,7 @@ html,body{height:100%;background:#040310;color:var(--text);font-family:'Crimson 
 .atk-note{font-size:11px;color:var(--text3);font-family:'Cinzel',serif;letter-spacing:.5px;text-align:center;padding:6px 12px;background:rgba(123,45,139,.08);border:1px dashed rgba(123,45,139,.3);border-radius:var(--r2);margin-top:8px;line-height:1.5}
 
 /* TARGET CURSOR — crosshair default, div-select on hover */
-*{cursor:none!important}
+*{cursor:auto!important}
 .cursor-outer{position:fixed;pointer-events:none;z-index:99999;width:36px;height:36px;transform:translate(-50%,-50%)}
 .cursor-ring{position:absolute;inset:0;border-radius:50%;border:1px solid rgba(201,168,76,0.6);transition:all 0.15s ease;animation:cursorPulse 2s ease-in-out infinite}
 .cursor-line{position:absolute;background:var(--gold);transition:all 0.15s ease}
