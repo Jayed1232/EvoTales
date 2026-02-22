@@ -935,11 +935,13 @@ export default function App() {
   const [modal, setModal] = useState(null)
   const [delTarget, setDelTarget] = useState(null)
   const [toast, setToast] = useState(null)
-  const [online, setOnline] = useState(navigator.onLine)
+  const [online, setOnline] = useState(false)
 
   useClickSpark()
   useEffect(() => {
     const on=()=>setOnline(true),off=()=>setOnline(false)
+// check on mount
+fetch('https://www.google.com/favicon.ico',{mode:'no-cors',cache:'no-store'}).then(()=>setOnline(true)).catch(()=>setOnline(false))
     window.addEventListener('online',on); window.addEventListener('offline',off)
     return () => { window.removeEventListener('online',on); window.removeEventListener('offline',off) }
   },[])
