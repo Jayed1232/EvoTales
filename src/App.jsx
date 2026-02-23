@@ -974,7 +974,7 @@ export default function App() {
   const publishStory = async (sId) => {
     if (!db) { showToast('Firebase unavailable'); return }
     const s=stories.find(x=>x.id===sId)
-    const payload={title:s.title,genre:s.genre,description:s.description,type:s.type,chapters:s.chapters||[],characters:s.characters||[],updatedAt:Date.now(),publishedAt:s.publishedAt||Date.now()}
+    const payload={title:s.title,genre:s.genre,description:s.description,type:s.type,content:s.content||'',chapters:s.chapters||[],characters:s.characters||[],updatedAt:Date.now(),publishedAt:s.publishedAt||Date.now()}
     try {
       if (s.firebaseId) { await updateDoc(doc(db,'published_stories',s.firebaseId),payload); showToast('Updated online ✦') }
       else {
