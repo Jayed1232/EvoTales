@@ -616,6 +616,8 @@ function StoryScreen({ story, onBack, onChapter, onChar, onEdit, setModal, setDe
 }
 
 // ── CHAPTER SCREEN ─────────────────────────────────────────────────────────
+const [editingTitle, setEditingTitle] = useState(false)
+const [chTitle, setChTitle] = useState(chapter.title)
 function ChapterScreen({ story, chapter, onBack, onPart, onToggleComplete, setModal, onUpdateChapter, setDelTarget, onDeleteChapter }) {
   const [edit, setEdit] = useState(false)
   const [content, setContent] = useState(chapter.content||'')
@@ -624,7 +626,10 @@ function ChapterScreen({ story, chapter, onBack, onPart, onToggleComplete, setMo
     <div className="screen-enter">
       <div className="screen-header">
         <button className="back-btn" onClick={onBack}>←</button>
-        <h2>{chapter.title}</h2>
+        {editingTitle
+  ? <input style={{background:'transparent',border:'none',borderBottom:'1px solid var(--gold)',color:'var(--gold2)',fontFamily:'Cinzel,serif',fontSize:16,outline:'none',width:'100%'}} value={chTitle} onChange={e=>setChTitle(e.target.value)} onBlur={()=>{onUpdateChapter({title:chTitle});setEditingTitle(false)}} onKeyDown={e=>e.key==='Enter'&&(onUpdateChapter({title:chTitle}),setEditingTitle(false))} autoFocus/>
+  : <h2 onClick={()=>setEditingTitle(true)} style={{cursor:'text'}} title="Click to rename">{chapter.title}</h2>
+}
         <MagnetBtn className="btn btn-sm btn-danger" onClick={() => { setDelTarget({label:chapter.title,fn:onDeleteChapter}); setModal('confirm') }}>🗑</MagnetBtn>
       </div>
       {!allOk&&<div style={{margin:'0 20px 12px',padding:'10px 14px',background:'rgba(193,18,31,0.1)',border:'1px solid rgba(193,18,31,0.3)',borderRadius:8,fontSize:12,color:'#ff6b6b',fontFamily:'Cinzel,serif'}}>⚠ Confirm all characters before writing</div>}
@@ -663,10 +668,15 @@ function ChapterScreen({ story, chapter, onBack, onPart, onToggleComplete, setMo
 
 function PartScreen({ part, onBack, onUpdate }) {
   const [v, sv] = useState(part.content||'')
+  const [editingTitle, setEditingTitle] = useState(false)
+  const [pTitle, setPTitle] = useState(part.title)
   const timer = useRef(null)
   return (
     <div className="screen-enter">
-      <div className="screen-header"><button className="back-btn" onClick={onBack}>←</button><h2>{part.title}</h2></div>
+      <div className="screen-header"><button className="back-btn" onClick={onBack}>←</button>{editingTitle
+  ? <input style={{background:'transparent',border:'none',borderBottom:'1px solid var(--gold)',color:'var(--gold2)',fontFamily:'Cinzel,serif',fontSize:16,outline:'none',width:'100%'}} value={pTitle} onChange={e=>setPTitle(e.target.value)} onBlur={()=>{onUpdate({title:pTitle});setEditingTitle(false)}} onKeyDown={e=>e.key==='Enter'&&(onUpdate({title:pTitle}),setEditingTitle(false))} autoFocus/>
+  : <h2 onClick={()=>setEditingTitle(true)} style={{cursor:'text'}} title="Click to rename">{part.title}</h2>
+}</div>
       <textarea className="editor-area" style={{minHeight:420}} placeholder="Write this part..." value={v}
         onChange={e => { sv(e.target.value); clearTimeout(timer.current); timer.current=setTimeout(()=>onUpdate({content:e.target.value}),900) }} autoFocus />
       <div style={{fontSize:11,color:'var(--text3)',textAlign:'right',padding:'4px 20px',fontFamily:'Cinzel,serif'}}>{v.trim()?v.trim().split(/\s+/).length:0} words</div>
