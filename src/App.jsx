@@ -616,8 +616,6 @@ function StoryScreen({ story, onBack, onChapter, onChar, onEdit, setModal, setDe
 }
 
 // ── CHAPTER SCREEN ─────────────────────────────────────────────────────────
-const [editingTitle, setEditingTitle] = useState(false)
-const [chTitle, setChTitle] = useState(chapter.title)
 function ChapterScreen({ story, chapter, onBack, onPart, onToggleComplete, setModal, onUpdateChapter, setDelTarget, onDeleteChapter }) {
   const [edit, setEdit] = useState(false)
   const [content, setContent] = useState(chapter.content||'')
@@ -626,10 +624,7 @@ function ChapterScreen({ story, chapter, onBack, onPart, onToggleComplete, setMo
     <div className="screen-enter">
       <div className="screen-header">
         <button className="back-btn" onClick={onBack}>←</button>
-        {editingTitle
-  ? <input style={{background:'transparent',border:'none',borderBottom:'1px solid var(--gold)',color:'var(--gold2)',fontFamily:'Cinzel,serif',fontSize:16,outline:'none',width:'100%'}} value={chTitle} onChange={e=>setChTitle(e.target.value)} onBlur={()=>{onUpdateChapter({title:chTitle});setEditingTitle(false)}} onKeyDown={e=>e.key==='Enter'&&(onUpdateChapter({title:chTitle}),setEditingTitle(false))} autoFocus/>
-  : <h2 onClick={()=>setEditingTitle(true)} style={{cursor:'text'}} title="Click to rename">{chapter.title}</h2>
-}
+        <h2>{chapter.title}</h2>
         <MagnetBtn className="btn btn-sm btn-danger" onClick={() => { setDelTarget({label:chapter.title,fn:onDeleteChapter}); setModal('confirm') }}>🗑</MagnetBtn>
       </div>
       {!allOk&&<div style={{margin:'0 20px 12px',padding:'10px 14px',background:'rgba(193,18,31,0.1)',border:'1px solid rgba(193,18,31,0.3)',borderRadius:8,fontSize:12,color:'#ff6b6b',fontFamily:'Cinzel,serif'}}>⚠ Confirm all characters before writing</div>}
@@ -673,12 +668,15 @@ function PartScreen({ part, onBack, onUpdate }) {
   const timer = useRef(null)
   return (
     <div className="screen-enter">
-      <div className="screen-header"><button className="back-btn" onClick={onBack}>←</button>{editingTitle
-  ? <input style={{background:'transparent',border:'none',borderBottom:'1px solid var(--gold)',color:'var(--gold2)',fontFamily:'Cinzel,serif',fontSize:16,outline:'none',width:'100%'}} value={pTitle} onChange={e=>setPTitle(e.target.value)} onBlur={()=>{onUpdate({title:pTitle});setEditingTitle(false)}} onKeyDown={e=>e.key==='Enter'&&(onUpdate({title:pTitle}),setEditingTitle(false))} autoFocus/>
-  : <h2 onClick={()=>setEditingTitle(true)} style={{cursor:'text'}} title="Click to rename">{part.title}</h2>
-}</div>
+      <div className="screen-header">
+        <button className="back-btn" onClick={onBack}>←</button>
+        {editingTitle
+          ? <input style={{background:'transparent',border:'none',borderBottom:'1px solid var(--gold)',color:'var(--gold2)',fontFamily:'Cinzel,serif',fontSize:16,outline:'none',flex:1}} value={pTitle} onChange={e=>setPTitle(e.target.value)} onBlur={()=>{onUpdate({title:pTitle});setEditingTitle(false)}} onKeyDown={e=>e.key==='Enter'&&(onUpdate({title:pTitle}),setEditingTitle(false))} autoFocus/>
+          : <h2 onClick={()=>setEditingTitle(true)} style={{cursor:'text'}} title="Click to rename">{pTitle}</h2>
+        }
+      </div>
       <textarea className="editor-area" style={{minHeight:420}} placeholder="Write this part..." value={v}
-        onChange={e => { sv(e.target.value); clearTimeout(timer.current); timer.current=setTimeout(()=>onUpdate({content:e.target.value}),900) }} autoFocus />
+        onChange={e => { sv(e.target.value); clearTimeout(timer.current); timer.current=setTimeout(()=>onUpdate({content:e.target.value}),900) }} />
       <div style={{fontSize:11,color:'var(--text3)',textAlign:'right',padding:'4px 20px',fontFamily:'Cinzel,serif'}}>{v.trim()?v.trim().split(/\s+/).length:0} words</div>
     </div>
   )
@@ -779,9 +777,9 @@ function ReaderPage({ story, onClose }) {
     gradeColor:GRADE_CLR[c.grade]||'#c9a84c',affColors:AFF_CLR,_ref:c
   }))
 
-  const ReaderNav = ({ title, onPressBack }) => (
+  const ReaderNav = ({ title, onPressBack, backLabel }) => (
     <div className="reader-nav">
-      <button onClick={onPressBack} style={{background:'rgba(201,168,76,0.12)',border:'1px solid rgba(201,168,76,0.3)',borderRadius:20,padding:'6px 16px',fontFamily:'Cinzel,serif',fontSize:12,color:'var(--gold2)',cursor:'pointer',letterSpacing:1,flexShrink:0}}>← Back</button>
+      <button className="back-btn" onClick={onPressBack}>←</button>
       <div className="reader-title">{title}</div>
     </div>
   )
@@ -1010,7 +1008,7 @@ export default function App() {
         <div className={'status-badge '+(online?'s-online':'s-offline')}><div className="sdot"/>{online?'Online':'Offline'}</div>
       </nav>
       <div className="tabs">
-        {['library','online'].map(t => <button key={t} className={'tab '+(tab===t?'active':'')} onClick={() => { if(t==='online'&&!online) return; switchTab(t) }} style={t==='online'&&!online?{opacity:0.4,cursor:'not-allowed'}:{}}>{t==='library'?'📚 Library':'🌐 Online'}</button>)}
+        {['library','online'].map(t => <button key={t} className={'tab '+(tab===t?'active':'')} onClick={() => switchTab(t)}>{t==='library'?'📚 Library':'🌐 Online'}</button>)}
       </div>
       <div className="content">{tab==='library'?renderScreen():<OnlineTab online={online} stories={stories} setModal={setModal}/>}</div>
       {showFab&&<MagnetBtn className="fab" onClick={fabAction}>{screen==='home'?'✦':'+'}</MagnetBtn>}
