@@ -4,6 +4,7 @@ import { db } from './firebase.js'
 import { uid, LS } from './utils.js'
 import { ARCHETYPES, AFFINITIES, SPECIAL_AFFs, ALL_ELEMENTS, GRADES, ROLES, GENRES, AFF_CLR, GRADE_CLR, calcStats, getTierName } from './constants.js'
 import CharacterGallery from './CharacterGallery.jsx'
+import CollabTab from './Collab.jsx'
 
 // ── CLICK SPARKS ───────────────────────────────────────────────────────────
 function useClickSpark() {
@@ -754,18 +755,11 @@ function ReaderPage({ story, onClose }) {
   const [view, setView] = useState('home')
   const [chIdx, setChIdx] = useState(0)
   const [pIdx, setPIdx] = useState(0)
-  const storageKey = 'evo_progress_' + story.id
-const [unlockedChs, setUnlockedChs] = useState(() => {
-  try { return JSON.parse(localStorage.getItem(storageKey)) || [0] } catch { return [0] }
-})
+  const [unlockedChs, setUnlockedChs] = useState([0])
   const [viewChar, setViewChar] = useState(null)
   const chapters = story.chapters||[]
 
-  const completeChapter = (idx) => setUnlockedChs(prev => {
-  const next = [...new Set([...prev,idx+1])]
-  localStorage.setItem(storageKey, JSON.stringify(next))
-  return next
-})
+  const completeChapter = (idx) => setUnlockedChs(prev => [...new Set([...prev,idx+1])])
 
   const charsAt = (cIdx) => {
     const ch = chapters[cIdx]
@@ -981,7 +975,7 @@ export default function App() {
   const publishStory = async (sId) => {
     if (!db) { showToast('Firebase unavailable'); return }
     const s=stories.find(x=>x.id===sId)
-    const payload={title:s.title,genre:s.genre,description:s.description,type:s.type,content:s.content||'',chapters:s.chapters||[],characters:s.characters||[],updatedAt:Date.now(),publishedAt:s.publishedAt||Date.now()}
+    const payload={title:s.title,genre:s.genre,description:s.description,type:s.type,chapters:s.chapters||[],characters:s.characters||[],updatedAt:Date.now(),publishedAt:s.publishedAt||Date.now()}
     try {
       if (s.firebaseId) { await updateDoc(doc(db,'published_stories',s.firebaseId),payload); showToast('Updated online ✦') }
       else {
@@ -1015,9 +1009,9 @@ export default function App() {
         <div className={'status-badge '+(online?'s-online':'s-offline')}><div className="sdot"/>{online?'Online':'Offline'}</div>
       </nav>
       <div className="tabs">
-        {['library','online'].map(t => <button key={t} className={'tab '+(tab===t?'active':'')} onClick={() => switchTab(t)}>{t==='library'?'📚 Library':'🌐 Online'}</button>)}
+        {['library','online','collab'].map(t => <button key={t} className={'tab '+(tab===t?'active':'')} onClick={() => { if((t==='online'||t==='collab')&&!online) return; switchTab(t) }} style={(t==='online'||t==='collab')&&!online?{opacity:0.4,cursor:'not-allowed'}:{}}>{t==='library'?'📚 Library':t==='online'?'🌐 Online':'🤝 Collab'}</button>)}
       </div>
-      <div className="content">{tab==='library'?renderScreen():<OnlineTab online={online} stories={stories} setModal={setModal}/>}</div>
+      <div className="content">{tab==='library'?renderScreen():tab==='online'?<OnlineTab online={online} stories={stories} setModal={setModal}/>:<CollabTab stories={stories} online={online}/>}</div>
       {showFab&&<MagnetBtn className="fab" onClick={fabAction}>{screen==='home'?'✦':'+'}</MagnetBtn>}
       {modal==='newStory'&&<NewStoryModal onClose={()=>setModal(null)} onCreate={createStory}/>}
       {modal==='newChapter'&&story&&<NewChapterModal onClose={()=>setModal(null)} onCreate={t=>createChapter(t,story.id)}/>}
