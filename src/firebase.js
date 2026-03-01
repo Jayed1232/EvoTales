@@ -23,4 +23,4 @@ try {
   console.warn('Firebase init failed:', e)
 }
 
-export { db, auth }
+export { db, auth, rtdb }
