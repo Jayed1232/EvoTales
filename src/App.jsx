@@ -4,7 +4,6 @@ import { db } from './firebase.js'
 import { uid, LS } from './utils.js'
 import { ARCHETYPES, AFFINITIES, SPECIAL_AFFs, ALL_ELEMENTS, GRADES, ROLES, GENRES, AFF_CLR, GRADE_CLR, calcStats, getTierName } from './constants.js'
 import CharacterGallery from './CharacterGallery.jsx'
-import CollabTab from './Collab.jsx'
 
 // ── CLICK SPARKS ───────────────────────────────────────────────────────────
 function useClickSpark() {
@@ -664,20 +663,12 @@ function ChapterScreen({ story, chapter, onBack, onPart, onToggleComplete, setMo
 
 function PartScreen({ part, onBack, onUpdate }) {
   const [v, sv] = useState(part.content||'')
-  const [editingTitle, setEditingTitle] = useState(false)
-  const [pTitle, setPTitle] = useState(part.title)
   const timer = useRef(null)
   return (
     <div className="screen-enter">
-      <div className="screen-header">
-        <button className="back-btn" onClick={onBack}>←</button>
-        {editingTitle
-          ? <input style={{background:'transparent',border:'none',borderBottom:'1px solid var(--gold)',color:'var(--gold2)',fontFamily:'Cinzel,serif',fontSize:16,outline:'none',flex:1}} value={pTitle} onChange={e=>setPTitle(e.target.value)} onBlur={()=>{onUpdate({title:pTitle});setEditingTitle(false)}} onKeyDown={e=>e.key==='Enter'&&(onUpdate({title:pTitle}),setEditingTitle(false))} autoFocus/>
-          : <h2 onClick={()=>setEditingTitle(true)} style={{cursor:'text'}} title="Click to rename">{pTitle}</h2>
-        }
-      </div>
+      <div className="screen-header"><button className="back-btn" onClick={onBack}>←</button><h2>{part.title}</h2></div>
       <textarea className="editor-area" style={{minHeight:420}} placeholder="Write this part..." value={v}
-        onChange={e => { sv(e.target.value); clearTimeout(timer.current); timer.current=setTimeout(()=>onUpdate({content:e.target.value}),900) }} />
+        onChange={e => { sv(e.target.value); clearTimeout(timer.current); timer.current=setTimeout(()=>onUpdate({content:e.target.value}),900) }} autoFocus />
       <div style={{fontSize:11,color:'var(--text3)',textAlign:'right',padding:'4px 20px',fontFamily:'Cinzel,serif'}}>{v.trim()?v.trim().split(/\s+/).length:0} words</div>
     </div>
   )
@@ -1009,9 +1000,9 @@ export default function App() {
         <div className={'status-badge '+(online?'s-online':'s-offline')}><div className="sdot"/>{online?'Online':'Offline'}</div>
       </nav>
       <div className="tabs">
-        {['library','online','collab'].map(t => <button key={t} className={'tab '+(tab===t?'active':'')} onClick={() => { if((t==='online'||t==='collab')&&!online) return; switchTab(t) }} style={(t==='online'||t==='collab')&&!online?{opacity:0.4,cursor:'not-allowed'}:{}}>{t==='library'?'📚 Library':t==='online'?'🌐 Online':'🤝 Collab'}</button>)}
+        {['library','online'].map(t => <button key={t} className={'tab '+(tab===t?'active':'')} onClick={() => switchTab(t)}>{t==='library'?'📚 Library':'🌐 Online'}</button>)}
       </div>
-      <div className="content">{tab==='library'?renderScreen():tab==='online'?<OnlineTab online={online} stories={stories} setModal={setModal}/>:<CollabTab stories={stories} online={online}/>}</div>
+      <div className="content">{tab==='library'?renderScreen():<OnlineTab online={online} stories={stories} setModal={setModal}/>}</div>
       {showFab&&<MagnetBtn className="fab" onClick={fabAction}>{screen==='home'?'✦':'+'}</MagnetBtn>}
       {modal==='newStory'&&<NewStoryModal onClose={()=>setModal(null)} onCreate={createStory}/>}
       {modal==='newChapter'&&story&&<NewChapterModal onClose={()=>setModal(null)} onCreate={t=>createChapter(t,story.id)}/>}
