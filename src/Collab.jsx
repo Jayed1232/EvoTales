@@ -59,7 +59,7 @@ function ChatPanel({ sessionId, user, members, onClose }) {
   useEffect(()=>{ bottomRef.current?.scrollIntoView({behavior:'smooth'}) },[messages])
   const send=async()=>{ if(!text.trim()||!rtdb)return; await push(ref(rtdb,'collab_sessions/'+sessionId+'/chat'),{text:text.trim(),userId:user.id,userName:user.name,ts:Date.now()}); setText('') }
   return (
-    <div style={{ position:'fixed',inset:0,zIndex:300,background:'var(--bg)',display:'flex',flexDirection:'column' }}>
+    <div style={{ position:'absolute',inset:0,zIndex:300,background:'var(--bg)',display:'flex',flexDirection:'column' }}>
       <HeaderBar left={<BackBtn onClick={onClose}/>} center={<div style={{ fontFamily:'Cinzel,serif',fontSize:13,color:'var(--gold2)',letterSpacing:2 }}>⚡ COLLAB CHAT</div>}/>
       <div style={{ padding:'8px 16px',borderBottom:'1px solid var(--border)',display:'flex',flexWrap:'wrap',gap:6 }}>
         {Object.values(members||{}).map(m=>(
@@ -95,7 +95,7 @@ function PartWriter({ sessionId, chapterId, part, user, canEdit, onBack, members
   const save=async(val)=>{ if(!rtdb)return; setSaving(true); await update(ref(rtdb,'collab_sessions/'+sessionId+'/chapters/'+chapterId+'/parts/'+part.id),{content:val,lastEditBy:user.name,lastEditAt:Date.now()}); setSaving(false) }
   if(showChat) return <ChatPanel sessionId={sessionId} user={user} members={members} onClose={()=>setShowChat(false)}/>
   return (
-    <div style={{ position:'fixed',inset:0,zIndex:250,background:'var(--bg)',display:'flex',flexDirection:'column' }}>
+    <div style={{ position:'absolute',inset:0,zIndex:250,background:'var(--bg)',display:'flex',flexDirection:'column' }}>
       <HeaderBar
         left={<BackBtn onClick={onBack}/>}
         center={<div style={{ fontFamily:'Cinzel,serif',fontSize:13,color:'var(--gold2)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' }}>{part.title}</div>}
@@ -122,7 +122,7 @@ function ChapterView({ sessionId, chapter, user, isOwner, onBack, members }) {
   if(showChat) return <ChatPanel sessionId={sessionId} user={user} members={members} onClose={()=>setShowChat(false)}/>
   if(activePart) return <PartWriter sessionId={sessionId} chapterId={chapter.id} part={activePart} user={user} canEdit={canEdit} onBack={()=>setActivePart(null)} members={members}/>
   return (
-    <div style={{ position:'fixed',inset:0,zIndex:220,background:'var(--bg)',display:'flex',flexDirection:'column' }}>
+    <div style={{ position:'absolute',inset:0,zIndex:220,background:'var(--bg)',display:'flex',flexDirection:'column' }}>
       <HeaderBar
         left={<BackBtn onClick={onBack}/>}
         center={<div style={{ fontFamily:'Cinzel,serif',fontSize:14,color:'var(--gold2)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' }}>{chapter.title}</div>}
@@ -180,7 +180,7 @@ function SessionView({ session, user, onBack }) {
   if(activeChapter) return <ChapterView sessionId={session.id} chapter={activeChapter} user={user} isOwner={isOwner} onBack={()=>setActiveChapter(null)} members={members}/>
 
   return (
-    <div style={{ position:'fixed',inset:0,zIndex:200,background:'var(--bg)',display:'flex',flexDirection:'column' }}>
+    <div style={{ position:'absolute',inset:0,zIndex:200,background:'var(--bg)',display:'flex',flexDirection:'column' }}>
       <HeaderBar
         left={<BackBtn onClick={onBack}/>}
         center={<div><div style={{ fontFamily:'Cinzel Decorative,serif',fontSize:13,color:'var(--gold2)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' }}>{session.title}</div><div style={{ fontSize:9,fontFamily:'Cinzel,serif',color:'var(--text3)',letterSpacing:1,marginTop:1 }}>{isOwner?'OWNER':'COLLABORATOR'} · {Object.keys(members).length} members</div></div>}
@@ -271,7 +271,7 @@ export default function CollabTab({ stories, online }) {
     const chapters={}
     ;(story.chapters||[]).forEach((ch,idx)=>{
       const parts={}
-      ;(ch.parts||[]).forEach((p,pi)=>{ const pid=p.id||uid(); parts[pid]={id:pid,title:p.title,content:p.content||'',order:pi} })
+      ;(ch.parts||[]).forEach((p,pi)=>{ const pid=p.id||uid(); parts[pid]={id:pid,title:p.title,content:p.content||'',order:pi} }); if(Object.keys(parts).length===0&&ch.content){ const pid=uid(); parts[pid]={id:pid,title:'Content',content:ch.content,order:0} }
       const cid=ch.id||uid()
       chapters[cid]={id:cid,title:ch.title,parts,order:idx,assignedTo:'all'}
     })
